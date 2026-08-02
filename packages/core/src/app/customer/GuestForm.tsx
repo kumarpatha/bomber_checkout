@@ -1,0 +1,233 @@
+import classNames from 'classnames';
+import { type FieldProps, type FormikProps, withFormik } from 'formik';
+import React, { type FunctionComponent, memo, type ReactNode, useCallback, useEffect } from 'react';
+import { object, string } from 'yup';
+
+import { useCheckout, useThemeContext } from '@bigcommerce/checkout/contexts';
+import {
+    TranslatedString,
+    withLanguage,
+    type WithLanguageProps,
+} from '@bigcommerce/checkout/locale';
+import { PayPalFastlaneWatermark } from '@bigcommerce/checkout/paypal-fastlane-integration';
+import {
+    BasicFormField,
+    Button,
+    ButtonVariant,
+    Fieldset,
+    Form,
+    Legend,
+} from '@bigcommerce/checkout/ui';
+
+import { getPrivacyPolicyValidationSchema, PrivacyPolicyField } from '../privacyPolicy';
+
+import SubscribeField from './SubscribeField';
+import { SubscribeSessionStorage } from './SubscribeSessionStorage';
+
+function getShouldSubscribeValue(
+    requiresMarketingConsent: boolean,
+    defaultShouldSubscribe: boolean,
+) {
+    if (SubscribeSessionStorage.getSubscribeStatus()) {
+        return true;
+    }
+
+    return requiresMarketingConsent ? false : defaultShouldSubscribe;
+}
+
+export interface GuestFormProps {
+    canSubscribe: boolean;
+    checkoutButtons?: ReactNode;
+    continueAsGuestButtonLabelId: string;
+    requiresMarketingConsent: boolean;
+    defaultShouldSubscribe: boolean;
+    email?: string;
+    isLoading: boolean;
+    privacyPolicyUrl?: string;
+    isExpressPrivacyPolicy: boolean;
+    isFloatingLabelEnabled?: boolean;
+    shouldShowEmailWatermark: boolean;
+    onChangeEmail(email: string): void;
+    onContinueAsGuest(data: GuestFormValues): void;
+    onShowLogin(): void;
+}
+
+export interface GuestFormValues {
+    email: string;
+    shouldSubscribe: boolean;
+}
+
+const GuestForm: FunctionComponent<
+    GuestFormProps & WithLanguageProps & FormikProps<GuestFormValues>
+> = ({
+    canSubscribe,
+    checkoutButtons,
+    continueAsGuestButtonLabelId,
+    defaultShouldSubscribe,
+    isLoading,
+    onShowLogin,
+    privacyPolicyUrl,
+    requiresMarketingConsent,
+    isExpressPrivacyPolicy,
+    isFloatingLabelEnabled,
+    shouldShowEmailWatermark,
+    setFieldValue,
+}) => {
+    const { selectedState: config } = useCheckout(({ data }) => data.getConfig());
+    const { themeV2 } = useThemeContext();
+
+    const renderField = useCallback(
+        (fieldProps: FieldProps<boolean>) => (
+            <SubscribeField {...fieldProps} requiresMarketingConsent={requiresMarketingConsent} />
+        ),
+        [requiresMarketingConsent],
+    );
+
+    useEffect(() => {
+        void setFieldValue(
+            'shouldSubscribe',
+            getShouldSubscribeValue(requiresMarketingConsent, defaultShouldSubscribe),
+        );
+    }, [requiresMarketingConsent, defaultShouldSubscribe]);
+
+    if (!config) {
+        return null;
+    }
+
+    const {
+        checkoutSettings: { shouldRedirectToStorefrontForAuth },
+        links: { checkoutLink, loginLink },
+    } = config;
+
+    const handleLogin: () => void = () => {
+        if (shouldRedirectToStorefrontForAuth) {
+            window.location.assign(`${loginLink}?redirectTo=${checkoutLink}`);
+
+            return;
+        }
+
+        return onShowLogin();
+    };
+
+    return (
+        <Form
+            className="checkout-form"
+            id="checkout-customer-guest"
+            testId="checkout-customer-guest"
+        >
+            <Fieldset
+                legend={
+                    <Legend hidden>
+                        <TranslatedString id="customer.guest_customer_text" />
+                    </Legend>
+                }
+            >
+                {themeV2 && !isLoading && (
+                    <p className="customer-login-link body-regular">
+                        <TranslatedString id="customer.login_text" />{' '}
+                        <a
+                            data-test="customer-continue-button"
+                            id="checkout-customer-login"
+                            onClick={handleLogin}
+                            role="button"
+                            tabIndex={0}
+                        >
+                            <TranslatedString id="customer.login_action" />
+                        </a>
+                    </p>
+                )}
+
+                <div className="customerEmail-container">
+                    <div className="customerEmail-body">
+                        {shouldShowEmailWatermark && <PayPalFastlaneWatermark />}
+
+                        {(canSubscribe || requiresMarketingConsent) && (
+                            <BasicFormField name="shouldSubscribe" render={renderField} />
+                        )}
+                    </div>
+
+                    <div
+                        className={classNames('form-actions customerEmail-action', {
+                            'customerEmail-floating--enabled': isFloatingLabelEnabled,
+                        })}
+                    >
+                      bbbbb  <Button
+                            className="customerEmail-button body-bold"
+                            id="checkout-customer-continue"
+                            isLoading={isLoading}
+                            testId="customer-continue-as-guest-button"
+                            type="submit"
+                            variant={ButtonVariant.Primary}
+                        >
+                            <TranslatedString id={continueAsGuestButtonLabelId} />
+                        </Button>
+                    </div>
+                </div>
+
+                {privacyPolicyUrl && (
+                    <PrivacyPolicyField
+                        isExpressPrivacyPolicy={isExpressPrivacyPolicy}
+                        url={privacyPolicyUrl}
+                    />
+                )}
+
+                {!themeV2 && !isLoading && (
+                    <p className="customer-login-link">
+                        <TranslatedString id="customer.login_text" />{' '}
+                        <a
+                            data-test="customer-continue-button"
+                            id="checkout-customer-login"
+                            onClick={handleLogin}
+                            role="button"
+                            tabIndex={0}
+                        >
+                            <TranslatedString id="customer.login_action" />
+                        </a>
+                    </p>
+                )}
+
+                {checkoutButtons}
+            </Fieldset>
+        </Form>
+    );
+};
+
+export default withLanguage(
+    withFormik<GuestFormProps & WithLanguageProps, GuestFormValues>({
+        mapPropsToValues: ({
+            email = '',
+            defaultShouldSubscribe = false,
+            requiresMarketingConsent,
+        }) => ({
+            email,
+            shouldSubscribe: getShouldSubscribeValue(
+                requiresMarketingConsent,
+                defaultShouldSubscribe,
+            ),
+            privacyPolicy: false,
+        }),
+        handleSubmit: (values, { props: { onContinueAsGuest } }) => {
+            onContinueAsGuest(values);
+        },
+        validationSchema: ({
+            language,
+            privacyPolicyUrl,
+            isExpressPrivacyPolicy,
+        }: GuestFormProps & WithLanguageProps) => {
+            const baseSchema = object({
+                email: string().trim().email(language.translate('customer.email_invalid_error')).max(256).notRequired(),
+            });
+
+            if (privacyPolicyUrl && !isExpressPrivacyPolicy) {
+                return baseSchema.concat(
+                    getPrivacyPolicyValidationSchema({
+                        isRequired: !!privacyPolicyUrl,
+                        language,
+                    }),
+                );
+            }
+
+            return baseSchema;
+        },
+    })(memo(GuestForm)),
+);

@@ -1,0 +1,318 @@
+import { type FormField, isExtraField } from '@bigcommerce/checkout-sdk/essential';
+import { useFormikContext } from 'formik';
+import { forIn, noop } from 'lodash';
+import React, { type ChangeEvent, useCallback, useEffect, useRef } from 'react';
+
+import { useCapabilities, useCheckout, useLocale } from '@bigcommerce/checkout/contexts';
+import { TranslatedString } from '@bigcommerce/checkout/locale';
+import { isPayPalFastlaneMethod } from '@bigcommerce/checkout/paypal-fastlane-integration';
+import {
+    type AutocompleteItem,
+    CheckboxFormField,
+    DynamicFormField,
+    DynamicFormFieldType,
+    Fieldset,
+    TextInput,
+} from '@bigcommerce/checkout/ui';
+import { isExperimentEnabled } from '@bigcommerce/checkout/utility';
+
+import { EMPTY_ARRAY, isFloatingLabelEnabled } from '../common/utility';
+import getProviderWithCustomCheckout from '../payment/getProviderWithCustomCheckout';
+
+import {
+    type AddressFormProps,
+    AUTOCOMPLETE,
+    AUTOCOMPLETE_FIELD_NAME,
+    LABEL,
+    PLACEHOLDER,
+} from './AddressFormType';
+import AddressLabelFormField from './AddressLabelFormField';
+import AddressType from './AddressType';
+import {
+    getAddressFormFieldInputId,
+    getAddressFormFieldLegacyName,
+} from './getAddressFormFieldInputId';
+import { GoogleAutocompleteFormField, mapToAddress } from './googleAutocomplete';
+import './AddressForm.scss';
+
+const AddressForm: React.FC<AddressFormProps> = ({
+    formFields,
+    fieldName,
+    countryCode,
+    onAutocompleteToggle,
+    shouldShowSaveAddress,
+    setFieldValue = noop,
+    onChange = noop,
+    type,
+}) => {
+    const {
+        userJourney: { hasCompanyAddressBook, hasAddressLabel },
+    } = useCapabilities();
+    const { language } = useLocale();
+    const { setFieldValue: setFormikFieldValue, values } = useFormikContext<Record<string, unknown>>();
+    const {
+        selectedState: { config, countries, customer },
+    } = useCheckout(({ data }) => ({
+        config: data.getConfig(),
+        countries:
+            (type === AddressType.Billing
+                ? data.getBillingCountries()
+                : data.getShippingCountries()) ?? EMPTY_ARRAY,
+        customer: data.getCustomer(),
+    }));
+    const googleMapsApiKey = config?.checkoutSettings.googleMapsApiKey || '';
+    const isFloatingLabelEnabledValue = config
+        ? isFloatingLabelEnabled(config.checkoutSettings)
+        : false;
+    const isPayPalFastlaneEnabled = isPayPalFastlaneMethod(
+        getProviderWithCustomCheckout(config?.checkoutSettings.providerWithCustomCheckout),
+    );
+    // PayPal Fastlane stores keep the legacy phone input for now, due to incident
+    const isNewPhoneValidationExperimentEnabled =
+        !isPayPalFastlaneEnabled &&
+        isExperimentEnabled(
+            config?.checkoutSettings,
+            'CHECKOUT-9019.use_new_phone_number_validation',
+            false,
+        );
+    const isNewGooglePlacesApiEnabled = isExperimentEnabled(
+        config?.checkoutSettings,
+        'CHECKOUT-10026.new_google_places_api',
+        false,
+    );
+    const countriesWithAutocomplete = ['US', 'CA', 'AU', 'NZ', 'GB'];
+
+    const containerRef = useRef<HTMLDivElement>(null);
+    const nextElementRef = useRef<HTMLElement | null>(null);
+
+    useEffect(() => {
+        const { current } = containerRef;
+
+        if (current) {
+            nextElementRef.current = current.querySelector<HTMLElement>(
+                '[autocomplete="address-line2"]',
+            );
+        }
+    }, []);
+
+    const syncNonFormikValue = useCallback(
+        (fieldName: string, value: string | string[]) => {
+            const dateFormFieldNames = formFields
+                .filter((field) => field.custom && field.fieldType === DynamicFormFieldType.DATE)
+                .map((field) => field.name);
+
+            if (fieldName === AUTOCOMPLETE_FIELD_NAME || dateFormFieldNames.includes(fieldName)) {
+                setFieldValue(fieldName, value);
+            }
+
+            onChange(fieldName, value);
+        },
+        [formFields, setFieldValue, onChange],
+    );
+
+    const handleDynamicFormFieldChange = useCallback(
+        (name: string) => (value: string | string[]) => {
+            syncNonFormikValue(name, value);
+        },
+        [syncNonFormikValue],
+    );
+
+    const handleAutocompleteChange = useCallback(
+        (value: string, isOpen: boolean) => {
+            if (!isOpen) {
+                syncNonFormikValue(AUTOCOMPLETE_FIELD_NAME, value);
+            }
+        },
+        [syncNonFormikValue],
+    );
+
+    const handleAutocompleteSelect = useCallback(
+        (place: google.maps.places.PlaceResult, item: AutocompleteItem) => {
+            const { value: autocompleteValue } = item;
+
+            const address = mapToAddress(place, countries);
+
+            forIn(address, (value, fieldName) => {
+                if (fieldName === AUTOCOMPLETE_FIELD_NAME && value === undefined) {
+                    return;
+                }
+
+                setFieldValue(fieldName, value as string);
+            });
+
+            const address1 = address.address1 ? address.address1 : autocompleteValue;
+
+            if (address1) {
+                syncNonFormikValue(AUTOCOMPLETE_FIELD_NAME, address1);
+            }
+        },
+        [countries, setFieldValue, syncNonFormikValue],
+    );
+
+    const getPlaceholderValue = useCallback(
+        (field: FormField, translatedPlaceholderId: string): string => {
+            if (field.default && field.fieldType !== 'dropdown') {
+                return field.default;
+            }
+
+            if (isExtraField(field) && field.fieldType === DynamicFormFieldType.DROPDOWN) {
+                return language.translate('common.please_select_text');
+            }
+
+            return translatedPlaceholderId && language.translate(translatedPlaceholderId);
+        },
+        [language],
+    );
+
+    const handleEmailChange = useCallback(
+        (event: ChangeEvent<HTMLInputElement>) => {
+            const email = event.target.value;
+
+            setFormikFieldValue('email', email);
+            onChange('email', email);
+        },
+        [onChange, setFormikFieldValue],
+    );
+
+    const shouldRenderEmailField =
+        type === AddressType.Billing
+            ? customer?.isGuest
+            : type === AddressType.Shipping && customer?.isGuest;
+
+    const renderFormField = (field: FormField) => {
+        if (field.hidden) {
+            return null;
+        }
+
+        const addressFieldName = field.name;
+        const translatedPlaceholderId = PLACEHOLDER[addressFieldName];
+        const getParentFieldName = () => {
+            if (field.custom) {
+                return fieldName ? `${fieldName}.customFields` : 'customFields';
+            }
+
+            if (isExtraField(field)) {
+                return fieldName ? `${fieldName}.extraFields` : 'extraFields';
+            }
+
+            return fieldName;
+        };
+
+        if (
+            addressFieldName === 'address1' &&
+            googleMapsApiKey &&
+            countryCode &&
+            countriesWithAutocomplete.includes(countryCode)
+        ) {
+            return (
+                <GoogleAutocompleteFormField
+                    apiKey={googleMapsApiKey}
+                    countryCode={countryCode}
+                    field={field}
+                    isFloatingLabelEnabled={isFloatingLabelEnabledValue}
+                    isNewPlacesApiEnabled={isNewGooglePlacesApiEnabled}
+                    key={field.id}
+                    nextElement={nextElementRef.current || undefined}
+                    onChange={handleAutocompleteChange}
+                    onSelect={handleAutocompleteSelect}
+                    onToggleOpen={onAutocompleteToggle}
+                    parentFieldName={fieldName}
+                    supportedCountries={countriesWithAutocomplete}
+                />
+            );
+        }
+
+        if (hasAddressLabel && addressFieldName === 'company') {
+            return (
+                <AddressLabelFormField
+                    field={field}
+                    inputId={getAddressFormFieldInputId(addressFieldName)}
+                    isFloatingLabelEnabled={isFloatingLabelEnabledValue}
+                    key={`${field.id}-${field.name}`}
+                    onChange={handleDynamicFormFieldChange(addressFieldName)}
+                    parentFieldName={getParentFieldName()}
+                />
+            );
+        }
+
+        return (
+            <DynamicFormField
+                autocomplete={AUTOCOMPLETE[field.name]}
+                extraClass={`dynamic-form-field--${getAddressFormFieldLegacyName(addressFieldName)}`}
+                field={field}
+                inputId={getAddressFormFieldInputId(addressFieldName)}
+                // stateOrProvince can sometimes be a dropdown or input, so relying on id is not sufficient
+                isFloatingLabelEnabled={isFloatingLabelEnabledValue}
+                isNewPhoneValidationExperimentEnabled={isNewPhoneValidationExperimentEnabled}
+                key={`${field.id}-${field.name}`}
+                label={
+                    field.custom || isExtraField(field) ? (
+                        field.label
+                    ) : (
+                        <TranslatedString id={LABEL[field.name]} />
+                    )
+                }
+                onChange={handleDynamicFormFieldChange(addressFieldName)}
+                parentFieldName={getParentFieldName()}
+                placeholder={getPlaceholderValue(field, translatedPlaceholderId)}
+                selectedCountry={countryCode}
+            />
+        );
+    };
+
+    return (
+        <>
+            <Fieldset>
+                <div className="checkout-address" ref={containerRef}>
+                    {formFields.flatMap((field) => {
+                        const renderedField = renderFormField(field);
+
+                        if (
+                            shouldRenderEmailField &&
+                            field.name === 'lastName' &&
+                            renderedField
+                        ) {
+                            return [
+                                renderedField,
+                                <div className="form-field" key="billing-email-field">
+                                    <label
+                                        className="form-label optimizedCheckout-form-label body-medium"
+                                        htmlFor={`${type === AddressType.Billing ? 'billing' : 'shipping'}-email`}
+                                    >
+                                        <span>Email</span>
+                                    </label>
+                                    <TextInput
+                                        autoComplete="email"
+                                        id={`${type === AddressType.Billing ? 'billing' : 'shipping'}-email`}
+                                        name="email"
+                                        type="email"
+                                        value={typeof values.email === 'string' ? values.email : ''}
+                                        onChange={handleEmailChange}
+                                    />
+                                </div>,
+                            ];
+                        }
+
+                        return renderedField ? [renderedField] : [];
+                    })}
+                </div>
+            </Fieldset>
+            {shouldShowSaveAddress && (
+                <CheckboxFormField
+                    labelContent={
+                        <TranslatedString
+                            id={
+                                hasCompanyAddressBook
+                                    ? 'address.save_to_company_addressbook'
+                                    : 'address.save_in_addressbook'
+                            }
+                        />
+                    }
+                    name={fieldName ? `${fieldName}.shouldSaveAddress` : 'shouldSaveAddress'}
+                />
+            )}
+        </>
+    );
+};
+
+export default AddressForm;
