@@ -46,7 +46,7 @@
 
     .dynamic-form-field--postCode {
         @include breakpoint("small") {
-            flex-basis: 30%;
+            flex-basis: 33.33%;
         }
     }
 
@@ -54,10 +54,8 @@
     .dynamic-form-field--province,
     .dynamic-form-field--provinceCode,
     .dynamic-form-field--city {
-        @include themeV2 {
-            @include breakpoint("small") {
-                flex-basis: 33.33%;
-            }
+        @include breakpoint("small") {
+            flex-basis: 33.33%;
         }
     }
 }

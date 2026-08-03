@@ -115,10 +115,15 @@ describe('PaymentBillingForm', () => {
         const firstNameIndex = labels.indexOf('First Name');
         const lastNameIndex = labels.indexOf('Last Name');
         const emailIndex = labels.indexOf('Email');
+        const countryIndex = labels.indexOf('Country');
 
         expect(firstNameIndex).toBeGreaterThanOrEqual(0);
         expect(lastNameIndex).toBeGreaterThanOrEqual(0);
         expect(emailIndex).toBeGreaterThan(lastNameIndex);
+
+        if (countryIndex >= 0) {
+            expect(countryIndex).toBeGreaterThan(emailIndex);
+        }
     });
 
     it('persists the guest email value entered in the billing form', async () => {

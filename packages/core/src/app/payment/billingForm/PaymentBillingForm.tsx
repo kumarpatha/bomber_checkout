@@ -13,6 +13,7 @@ import {
     AddressType,
     decodeAddressLabel,
     isValidCustomerAddress,
+    reorderAddressFormFields,
 } from '../../address';
 import {
     type BillingFormValues,
@@ -82,7 +83,7 @@ const PaymentBillingFormComponent = ({
 
     const isGuest = customer.isGuest;
     const shouldRenderStaticAddress = methodId === 'amazonpay';
-    const allFormFields = getFields(values.countryCode);
+    const allFormFields = reorderAddressFormFields(getFields(values.countryCode));
     const customOrExtraFields = allFormFields.filter(
         (field) => field.custom || isExtraField(field),
     );

@@ -591,6 +591,7 @@
             "shipping_option_expired_error": "The shipping price you were quoted is no longer valid. Click OK to see the most up-to-date shipping prices.",
             "shipping_option_expired_heading": "Your shipping price has been updated",
             "view_shipping_options_action": "See Other Options",
+            "is_gift_label": "This is a gift.",
             "quantity_required_error": "Quantity is required",
             "quantity_invalid_error": "Quantity must be a number",
             "quantity_max_error": "Quantity cannot exceed \"Left to allocate\" amount.",

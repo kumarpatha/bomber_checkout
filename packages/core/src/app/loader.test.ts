@@ -180,6 +180,21 @@ describe('loadFiles', () => {
         expect(result.appVersion).toEqual(manifestJson.appVersion);
     });
 
+    it('resolves when app export is default-wrapped on window object', async () => {
+        (global as any).checkout = {
+            default: appExports,
+        };
+
+        const result = await loadFiles(options);
+
+        await result.renderCheckout({
+            checkoutId: 'abc',
+            containerId: CHECKOUT_ROOT_NODE_ID,
+        });
+
+        expect(appExports.renderCheckout).toHaveBeenCalled();
+    });
+
     it('resolves with render checkout function', async () => {
         const result = await loadFiles(options);
 

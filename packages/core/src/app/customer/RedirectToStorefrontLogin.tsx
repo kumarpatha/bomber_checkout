@@ -25,7 +25,8 @@ export const RedirectToStorefrontLogin: React.FC<RedirectToStorefrontLoginProps>
         return window.location.assign(`${loginLink}?redirectTo=${checkoutLink}`);
     };
 
-    return <Button
+    return (
+        <Button
             className="body-bold"
             disabled={isDisabled}
             id="checkout-customer-continue"

@@ -1,9 +1,9 @@
 import { type FormField } from '@bigcommerce/checkout-sdk';
 
 const ADDRESS_FIELD_ORDER = [
-    'countryCode',
     'firstName',
     'lastName',
+    'countryCode',
     'company',
     'address1',
     'address2',

@@ -15,7 +15,7 @@ describe('reorderAddressFormFields()', () => {
         expect(reorderAddressFormFields([])).toEqual([]);
     });
 
-    it('puts countryCode first, then firstName, lastName, company, address fields, phone last', () => {
+    it('puts firstName and lastName before countryCode, then company, address fields, phone last', () => {
         const fields = [
             createField('firstName'),
             createField('countryCode'),
@@ -27,8 +27,8 @@ describe('reorderAddressFormFields()', () => {
         const result = reorderAddressFormFields(fields);
 
         expect(result.map((f) => f.name)).toEqual([
-            'countryCode',
             'firstName',
+            'countryCode',
             'company',
             'address1',
             'city',
@@ -73,7 +73,7 @@ describe('reorderAddressFormFields()', () => {
         const fields = [createField('countryCode'), createField('firstName'), createField('phone')];
         const result = reorderAddressFormFields(fields);
 
-        expect(result.map((f) => f.name)).toEqual(['countryCode', 'firstName', 'phone']);
+        expect(result.map((f) => f.name)).toEqual(['firstName', 'countryCode', 'phone']);
     });
 
     it('handles missing phone', () => {
@@ -84,7 +84,7 @@ describe('reorderAddressFormFields()', () => {
         ];
         const result = reorderAddressFormFields(fields);
 
-        expect(result.map((f) => f.name)).toEqual(['countryCode', 'firstName', 'company']);
+        expect(result.map((f) => f.name)).toEqual(['firstName', 'countryCode', 'company']);
     });
 
     it('reorders real address form fields from mock', () => {
@@ -93,8 +93,8 @@ describe('reorderAddressFormFields()', () => {
 
         const names = result.map((f) => f.name);
 
-        expect(names.indexOf('countryCode')).toBe(0);
-        expect(names.indexOf('firstName')).toBe(1);
+        expect(names.indexOf('firstName')).toBe(0);
+        expect(names.indexOf('countryCode')).toBeGreaterThan(names.indexOf('lastName'));
         expect(names).toContain('phone');
         expect(result.length).toBe(fields.length);
     });

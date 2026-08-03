@@ -7,7 +7,7 @@ import { lazy, object, string } from 'yup';
 
 import { useCapabilities, useCheckout, useThemeContext } from '@bigcommerce/checkout/contexts';
 import { TranslatedString, withLanguage, type WithLanguageProps } from '@bigcommerce/checkout/locale';
-import { Fieldset, Form } from '@bigcommerce/checkout/ui';
+import { CheckboxFormField, Fieldset, Form } from '@bigcommerce/checkout/ui';
 
 import {
     type AddressFormValues,
@@ -55,6 +55,7 @@ interface AddressWithEmail extends Address {
 }
 
 export interface SingleShippingFormValues {
+    isGift: boolean;
     billingSameAsShipping: boolean;
     email?: string;
     shippingAddress?: AddressFormValues;
@@ -350,6 +351,12 @@ const SingleShippingForm: React.FC<
                 />
                 {shouldShowBillingSameAsShipping && (
                     <div className="form-body">
+                        <CheckboxFormField
+                            id="isGift"
+                            labelContent={<TranslatedString id="shipping.is_gift_label" />}
+                            name="isGift"
+                            testId="isGift"
+                        />
                         <BillingSameAsShippingField />
                     </div>
                 )}
@@ -382,6 +389,7 @@ export default withLanguage(
             isBillingSameAsShipping,
             customerMessage,
         }) => ({
+            isGift: false,
             billingSameAsShipping: isBillingSameAsShipping,
             email: (shippingAddress as AddressWithEmail | undefined)?.email || '',
             orderComment: customerMessage,

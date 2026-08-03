@@ -30,6 +30,35 @@ export interface LoadFilesResult {
     renderOrderConfirmation(options: RenderOrderConfirmationOptions): void;
 }
 
+function getAppExportFromWindow(windowLibraryExport: unknown): unknown {
+    if (isAppExport(windowLibraryExport)) {
+        return windowLibraryExport;
+    }
+
+    if (
+        typeof windowLibraryExport === 'object' &&
+        windowLibraryExport !== null &&
+        'default' in windowLibraryExport
+    ) {
+        return (windowLibraryExport as { default: unknown }).default;
+    }
+
+    return windowLibraryExport;
+}
+
+function getLibraryName(): string {
+    // LIBRARY_NAME is usually injected at build time, but some consumers execute
+    // this code without that substitution.
+    if (typeof LIBRARY_NAME === 'string' && LIBRARY_NAME) {
+        return LIBRARY_NAME;
+    }
+
+    const runtimeLibraryName = (globalThis as typeof globalThis & { LIBRARY_NAME?: string })
+        .LIBRARY_NAME;
+
+    return runtimeLibraryName || 'checkout';
+}
+
 async function getManifestJson(publicPath: string): Promise<AssetManifest> {
     const manifestJson = (globalThis as typeof globalThis & { MANIFEST_JSON?: AssetManifest })
         .MANIFEST_JSON;
@@ -52,6 +81,7 @@ async function getManifestJson(publicPath: string): Promise<AssetManifest> {
 export async function loadFiles(options?: LoadFilesOptions): Promise<LoadFilesResult> {
     const publicPath = configurePublicPath(options && options.publicPath);
     const isConsistentCrossOriginFixEnabled = Boolean(options?.isConsistentCrossOriginFixEnabled);
+    const libraryName = getLibraryName();
     const manifestJson = await getManifestJson(publicPath);
 
     const {
@@ -113,11 +143,11 @@ export async function loadFiles(options?: LoadFilesOptions): Promise<LoadFilesRe
 
     return Promise.all([getDefaultTranslations(languageConfig.locale), scripts, stylesheets]).then(
         ([defaultTranslations]) => {
-            if (!isRecordContainingKey(window, LIBRARY_NAME)) {
-                throw new Error(`'${LIBRARY_NAME}' property is not available in window.`);
+            if (!isRecordContainingKey(window, libraryName)) {
+                throw new Error(`'${libraryName}' property is not available in window.`);
             }
 
-            const appExport = window[LIBRARY_NAME];
+            const appExport = getAppExportFromWindow(window[libraryName]);
 
             if (!isAppExport(appExport)) {
                 throw new Error(

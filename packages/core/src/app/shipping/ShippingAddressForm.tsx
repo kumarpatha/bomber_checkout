@@ -1,7 +1,7 @@
 import { type Address, type Consignment, type FormField } from '@bigcommerce/checkout-sdk';
 import React, { type ReactElement } from 'react';
 
-import { useCapabilities, useCheckout, useThemeContext } from '@bigcommerce/checkout/contexts';
+import { useCapabilities, useCheckout } from '@bigcommerce/checkout/contexts';
 import { Fieldset, LoadingOverlay, TextInput } from '@bigcommerce/checkout/ui';
 
 import {
@@ -45,7 +45,6 @@ const ShippingAddressForm = ({
     const {
         selectedState: { customer },
     } = useCheckout(({ data }) => ({ customer: data.getCustomer() }));
-    const { themeV2 } = useThemeContext();
     const {
         shipping: { hideSaveToAddressBookCheck, restrictManualAddressEntry },
         userJourney: { hasAddressLabel },
@@ -93,7 +92,7 @@ const ShippingAddressForm = ({
     );
     const shouldRenderGuestEmailField = customer?.isGuest && hasValidCustomerAddress;
 
-    const sortedFormFields = themeV2 ? reorderAddressFormFields(formFields) : formFields;
+    const sortedFormFields = reorderAddressFormFields(formFields);
 
     return (
         <Fieldset id="checkoutShippingAddress">
